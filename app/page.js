@@ -39,75 +39,87 @@ export default function Home() {
   const updateInventory = useCallback(async () => {
     if (typeof window === 'undefined') return; // Prevents execution during SSR
 
-    const snapshot = query(collection(firestore, 'inventory'));
-    const docs = await getDocs(snapshot);
-    const inventoryList = [];
-    docs.forEach((doc) => {
-      inventoryList.push({
-        name: doc.id,
-        ...doc.data(),
+    try {
+      const snapshot = query(collection(firestore, 'inventory'));
+      const docs = await getDocs(snapshot);
+      const inventoryList = [];
+      docs.forEach((doc) => {
+        inventoryList.push({
+          name: doc.id,
+          ...doc.data(),
+        });
       });
-    });
 
-    // Apply search filter
-    const filteredInventory = inventoryList.filter((item) =>
-      item.name.toLowerCase().includes(searchValue.toLowerCase())
-    );
+      // Apply search filter
+      const filteredInventory = inventoryList.filter((item) =>
+        item.name.toLowerCase().includes(searchValue.toLowerCase())
+      );
 
-    // Apply sort filter
-    if (filter.field === 'Name') {
-      filteredInventory.sort((a, b) => {
-        if (filter.order === 'asc') {
-          return a.name.localeCompare(b.name);
-        } else {
-          return b.name.localeCompare(a.name);
-        }
-      });
-    } else if (filter.field === 'Count') {
-      filteredInventory.sort((a, b) => {
-        if (filter.order === 'asc') {
-          return a.quantity - b.quantity;
-        } else {
-          return b.quantity - a.quantity;
-        }
-      });
+      // Apply sort filter
+      if (filter.field === 'Name') {
+        filteredInventory.sort((a, b) => {
+          if (filter.order === 'asc') {
+            return a.name.localeCompare(b.name);
+          } else {
+            return b.name.localeCompare(a.name);
+          }
+        });
+      } else if (filter.field === 'Count') {
+        filteredInventory.sort((a, b) => {
+          if (filter.order === 'asc') {
+            return a.quantity - b.quantity;
+          } else {
+            return b.quantity - a.quantity;
+          }
+        });
+      }
+      setInventory(filteredInventory);
+    } catch (error) {
+      console.error('Error updating inventory:', error);
     }
-    setInventory(filteredInventory);
   }, [filter, searchValue]);
 
   const addItem = async (item) => {
-    const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
-    const docSnap = await getDoc(docRef);
+    try {
+      const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
+      const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists()) {
-      const { quantity } = docSnap.data();
-      await setDoc(docRef, { quantity: quantity + 1 });
-    } else {
-      await setDoc(docRef, { quantity: 1 });
+      if (docSnap.exists()) {
+        const { quantity } = docSnap.data();
+        await setDoc(docRef, { quantity: quantity + 1 });
+      } else {
+        await setDoc(docRef, { quantity: 1 });
+      }
+
+      await updateInventory();
+    } catch (error) {
+      console.error('Error adding item:', error);
     }
-
-    await updateInventory();
   };
 
   const removeItem = async (item) => {
-    const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
-    const docSnap = await getDoc(docRef);
+    try {
+      const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
+      const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists()) {
-      const { quantity } = docSnap.data();
-      if (quantity === 1) {
-        await deleteDoc(docRef);
-      } else {
-        await setDoc(docRef, { quantity: quantity - 1 });
+      if (docSnap.exists()) {
+        const { quantity } = docSnap.data();
+        if (quantity === 1) {
+          await deleteDoc(docRef);
+        } else {
+          await setDoc(docRef, { quantity: quantity - 1 });
+        }
       }
-    }
 
-    await updateInventory();
+      await updateInventory();
+    } catch (error) {
+      console.error('Error removing item:', error);
+    }
   };
 
   useEffect(() => {
     updateInventory();
-  }, [filter, searchValue, updateInventory]);
+  }, [updateInventory]);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
@@ -243,10 +255,15 @@ export default function Home() {
             />
             <Button
               variant="outlined"
-              onClick={() => {
-                addItem(itemName);
-                setItemName('');
-                handleClose();
+              onClick={async () => {
+                try {
+                  await addItem(itemName);
+                } catch (error) {
+                  console.error('Error adding item:', error);
+                } finally {
+                  setItemName('');
+                  handleClose();
+                }
               }}
             >
               Add
