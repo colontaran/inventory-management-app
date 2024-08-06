@@ -37,6 +37,8 @@ export default function Home() {
   const [filter, setFilter] = useState({ field: '', order: '' });
 
   const updateInventory = useCallback(async () => {
+    if (typeof window === 'undefined') return; // Prevents execution during SSR
+
     const snapshot = query(collection(firestore, 'inventory'));
     const docs = await getDocs(snapshot);
     const inventoryList = [];
