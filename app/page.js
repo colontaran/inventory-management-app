@@ -1,19 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useCallback } from 'react';
-import dynamic from 'next/dynamic'; // Dynamically import Firebase
+import { useState, useEffect } from 'react';
+import { firestore } from '@/firebase';
 import { Box, Typography, Modal, Stack, TextField, Button, Autocomplete, IconButton } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import RemoveOutlinedIcon from '@mui/icons-material/RemoveOutlined';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 import FilterAltOffOutlinedIcon from '@mui/icons-material/FilterAltOffOutlined';
-
-// Dynamically import Firebase to ensure it's only loaded on the client side
-const loadFirebase = async () => {
-  const firebase = await import('@/firebase');
-  return firebase;
-};
+import { collection, doc, getDocs, query, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 
 const style = {
   position: 'absolute',
@@ -36,106 +31,77 @@ export default function Home() {
   const [itemName, setItemName] = useState('');
   const [searchValue, setSearchValue] = useState('');
   const [filter, setFilter] = useState({ field: '', order: '' });
-  const [firestore, setFirestore] = useState(null);
 
-  // Load Firebase on client side
-  useEffect(() => {
-    const initializeFirebase = async () => {
-      const firebase = await loadFirebase();
-      setFirestore(firebase.firestore);
-    };
-
-    initializeFirebase();
-  }, []);
-
-  const updateInventory = useCallback(async () => {
-    if (!firestore) return; // Prevents execution if firestore is not initialized
-
-    try {
-      const snapshot = query(collection(firestore, 'inventory'));
-      const docs = await getDocs(snapshot);
-      const inventoryList = [];
-      docs.forEach((doc) => {
-        inventoryList.push({
-          name: doc.id,
-          ...doc.data(),
-        });
+  const updateInventory = async () => {
+    const snapshot = query(collection(firestore, 'inventory'));
+    const docs = await getDocs(snapshot);
+    const inventoryList = [];
+    docs.forEach((doc) => {
+      inventoryList.push({
+        name: doc.id,
+        ...doc.data(),
       });
+    });
 
-      // Apply search filter
-      const filteredInventory = inventoryList.filter((item) =>
-        item.name.toLowerCase().includes(searchValue.toLowerCase())
-      );
+    // Apply search filter
+    const filteredInventory = inventoryList.filter((item) =>
+      item.name.toLowerCase().includes(searchValue.toLowerCase())
+    );
 
-      // Apply sort filter
-      if (filter.field === 'Name') {
-        filteredInventory.sort((a, b) => {
-          if (filter.order === 'asc') {
-            return a.name.localeCompare(b.name);
-          } else {
-            return b.name.localeCompare(a.name);
-          }
-        });
-      } else if (filter.field === 'Count') {
-        filteredInventory.sort((a, b) => {
-          if (filter.order === 'asc') {
-            return a.quantity - b.quantity;
-          } else {
-            return b.quantity - a.quantity;
-          }
-        });
-      }
-      setInventory(filteredInventory);
-    } catch (error) {
-      console.error('Error updating inventory:', error);
+    // Apply sort filter
+    if (filter.field === 'Name') {
+      filteredInventory.sort((a, b) => {
+        if (filter.order === 'asc') {
+          return a.name.localeCompare(b.name);
+        } else {
+          return b.name.localeCompare(a.name);
+        }
+      });
+    } else if (filter.field === 'Count') {
+      filteredInventory.sort((a, b) => {
+        if (filter.order === 'asc') {
+          return a.quantity - b.quantity;
+        } else {
+          return b.quantity - a.quantity;
+        }
+      });
     }
-  }, [firestore, filter, searchValue]);
+    setInventory(filteredInventory);
+  };
 
   const addItem = async (item) => {
-    if (!firestore) return; // Prevent execution if firestore is not initialized
+    const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
+    const docSnap = await getDoc(docRef);
 
-    try {
-      const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const { quantity } = docSnap.data();
-        await setDoc(docRef, { quantity: quantity + 1 });
-      } else {
-        await setDoc(docRef, { quantity: 1 });
-      }
-
-      await updateInventory();
-    } catch (error) {
-      console.error('Error adding item:', error);
+    if (docSnap.exists()) {
+      const { quantity } = docSnap.data();
+      await setDoc(docRef, { quantity: quantity + 1 });
+    } else {
+      await setDoc(docRef, { quantity: 1 });
     }
+
+    await updateInventory();
   };
 
   const removeItem = async (item) => {
-    if (!firestore) return; // Prevent execution if firestore is not initialized
+    const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
+    const docSnap = await getDoc(docRef);
 
-    try {
-      const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const { quantity } = docSnap.data();
-        if (quantity === 1) {
-          await deleteDoc(docRef);
-        } else {
-          await setDoc(docRef, { quantity: quantity - 1 });
-        }
+    if (docSnap.exists()) {
+      const { quantity } = docSnap.data();
+      if (quantity === 1) {
+        await deleteDoc(docRef);
+      } else {
+        await setDoc(docRef, { quantity: quantity - 1 });
       }
-
-      await updateInventory();
-    } catch (error) {
-      console.error('Error removing item:', error);
     }
+
+    await updateInventory();
   };
 
   useEffect(() => {
     updateInventory();
-  }, [updateInventory]);
+  }, [filter, searchValue]);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
@@ -271,15 +237,10 @@ export default function Home() {
             />
             <Button
               variant="outlined"
-              onClick={async () => {
-                try {
-                  await addItem(itemName);
-                } catch (error) {
-                  console.error('Error adding item:', error);
-                } finally {
-                  setItemName('');
-                  handleClose();
-                }
+              onClick={() => {
+                addItem(itemName);
+                setItemName('');
+                handleClose();
               }}
             >
               Add
