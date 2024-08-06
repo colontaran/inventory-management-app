@@ -33,40 +33,41 @@ export default function Home() {
   const [filter, setFilter] = useState({ field: '', order: '' });
 
   const updateInventory = async () => {
-    const snapshot = query(collection(firestore, 'inventory'));
-    const docs = await getDocs(snapshot);
-    const inventoryList = [];
-    docs.forEach((doc) => {
-      inventoryList.push({
-        name: doc.id,
-        ...doc.data(),
+    try {
+      const snapshot = query(collection(firestore, 'inventory'));
+      const docs = await getDocs(snapshot);
+      const inventoryList = [];
+      docs.forEach((doc) => {
+        inventoryList.push({
+          name: doc.id,
+          ...doc.data(),
+        });
       });
-    });
 
-    // Apply search filter
-    const filteredInventory = inventoryList.filter((item) =>
-      item.name.toLowerCase().includes(searchValue.toLowerCase())
-    );
+      // Handle empty or null searchValue
+      const normalizedSearchValue = (searchValue || '').toLowerCase();
+      const filteredInventory = inventoryList.filter((item) =>
+        item.name.toLowerCase().includes(normalizedSearchValue)
+      );
 
-    // Apply sort filter
-    if (filter.field === 'Name') {
-      filteredInventory.sort((a, b) => {
-        if (filter.order === 'asc') {
-          return a.name.localeCompare(b.name);
-        } else {
-          return b.name.localeCompare(a.name);
-        }
-      });
-    } else if (filter.field === 'Count') {
-      filteredInventory.sort((a, b) => {
-        if (filter.order === 'asc') {
-          return a.quantity - b.quantity;
-        } else {
-          return b.quantity - a.quantity;
-        }
-      });
+      // Apply sorting
+      if (filter.field === 'Name') {
+        filteredInventory.sort((a, b) => {
+          return filter.order === 'asc'
+            ? a.name.localeCompare(b.name)
+            : b.name.localeCompare(a.name);
+        });
+      } else if (filter.field === 'Count') {
+        filteredInventory.sort((a, b) => {
+          return filter.order === 'asc'
+            ? a.quantity - b.quantity
+            : b.quantity - a.quantity;
+        });
+      }
+      setInventory(filteredInventory);
+    } catch (error) {
+      console.error('Error updating inventory:', error);
     }
-    setInventory(filteredInventory);
   };
 
   const addItem = async (item) => {
@@ -139,10 +140,10 @@ export default function Home() {
           Add New Item
         </Button>
         <Autocomplete
-          value={searchValue}
-          onChange={(event, newValue) => setSearchValue(newValue)}
+          value={inventory.find(item => item.name === searchValue) || null}
+          onChange={(event, newValue) => setSearchValue(newValue || '')}
           inputValue={searchValue}
-          onInputChange={(event, newInputValue) => setSearchValue(newInputValue)}
+          onInputChange={(event, newInputValue) => setSearchValue(newInputValue || '')}
           id="search-bar"
           options={inventory.map((item) => item.name)}
           sx={{ width: 300 }}
