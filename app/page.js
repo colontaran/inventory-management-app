@@ -197,10 +197,10 @@ export default function Home() {
               border={'1px solid #ccc'}
               borderRadius={2}
             >
-              <Typography variant="h5" color="#333" textAlign="left" width="15%">
+              <Typography variant="h5" color="#333" textAlign="left" width="50%">
                 {name.charAt(0).toUpperCase() + name.slice(1)}
               </Typography>
-              <Typography variant="h5" color="#333" textAlign="center" width="10%">
+              <Typography variant="h5" color="#333" textAlign="center" width="40%">
                 {quantity}
               </Typography>
               <Stack direction="row" spacing={1}>
