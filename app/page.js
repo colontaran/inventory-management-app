@@ -1,18 +1,19 @@
-'use client'
+'use client';
 
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
-import { firestore } from '@/firebase';
-import {
-  Box, Typography, Modal, Stack, TextField, Button, Autocomplete, IconButton
-} from '@mui/material';
+import dynamic from 'next/dynamic'; // Dynamically import Firebase
+import { Box, Typography, Modal, Stack, TextField, Button, Autocomplete, IconButton } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import RemoveOutlinedIcon from '@mui/icons-material/RemoveOutlined';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 import FilterAltOffOutlinedIcon from '@mui/icons-material/FilterAltOffOutlined';
-import {
-  collection, doc, getDocs, query, setDoc, deleteDoc, getDoc
-} from 'firebase/firestore';
+
+// Dynamically import Firebase to ensure it's only loaded on the client side
+const loadFirebase = async () => {
+  const firebase = await import('@/firebase');
+  return firebase;
+};
 
 const style = {
   position: 'absolute',
@@ -35,9 +36,20 @@ export default function Home() {
   const [itemName, setItemName] = useState('');
   const [searchValue, setSearchValue] = useState('');
   const [filter, setFilter] = useState({ field: '', order: '' });
+  const [firestore, setFirestore] = useState(null);
+
+  // Load Firebase on client side
+  useEffect(() => {
+    const initializeFirebase = async () => {
+      const firebase = await loadFirebase();
+      setFirestore(firebase.firestore);
+    };
+
+    initializeFirebase();
+  }, []);
 
   const updateInventory = useCallback(async () => {
-    if (typeof window === 'undefined') return; // Prevents execution during SSR
+    if (!firestore) return; // Prevents execution if firestore is not initialized
 
     try {
       const snapshot = query(collection(firestore, 'inventory'));
@@ -77,9 +89,11 @@ export default function Home() {
     } catch (error) {
       console.error('Error updating inventory:', error);
     }
-  }, [filter, searchValue]);
+  }, [firestore, filter, searchValue]);
 
   const addItem = async (item) => {
+    if (!firestore) return; // Prevent execution if firestore is not initialized
+
     try {
       const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
       const docSnap = await getDoc(docRef);
@@ -98,6 +112,8 @@ export default function Home() {
   };
 
   const removeItem = async (item) => {
+    if (!firestore) return; // Prevent execution if firestore is not initialized
+
     try {
       const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
       const docSnap = await getDoc(docRef);
