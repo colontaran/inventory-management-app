@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { firestore } from '@/firebase';
 import {
   Box, Typography, Modal, Stack, TextField, Button, Autocomplete, IconButton
@@ -36,44 +36,42 @@ export default function Home() {
   const [searchValue, setSearchValue] = useState('');
   const [filter, setFilter] = useState({ field: '', order: '' });
 
-  const updateInventory = async () => {
-    if (typeof window !== 'undefined') {
-      const snapshot = query(collection(firestore, 'inventory'));
-      const docs = await getDocs(snapshot);
-      const inventoryList = [];
-      docs.forEach((doc) => {
-        inventoryList.push({
-          name: doc.id,
-          ...doc.data(),
-        });
+  const updateInventory = useCallback(async () => {
+    const snapshot = query(collection(firestore, 'inventory'));
+    const docs = await getDocs(snapshot);
+    const inventoryList = [];
+    docs.forEach((doc) => {
+      inventoryList.push({
+        name: doc.id,
+        ...doc.data(),
       });
+    });
 
-      // Apply search filter
-      const filteredInventory = inventoryList.filter((item) =>
-        item.name.toLowerCase().includes(searchValue.toLowerCase())
-      );
+    // Apply search filter
+    const filteredInventory = inventoryList.filter((item) =>
+      item.name.toLowerCase().includes(searchValue.toLowerCase())
+    );
 
-      // Apply sort filter
-      if (filter.field === 'Name') {
-        filteredInventory.sort((a, b) => {
-          if (filter.order === 'asc') {
-            return a.name.localeCompare(b.name);
-          } else {
-            return b.name.localeCompare(a.name);
-          }
-        });
-      } else if (filter.field === 'Count') {
-        filteredInventory.sort((a, b) => {
-          if (filter.order === 'asc') {
-            return a.quantity - b.quantity;
-          } else {
-            return b.quantity - a.quantity;
-          }
-        });
-      }
-      setInventory(filteredInventory);
+    // Apply sort filter
+    if (filter.field === 'Name') {
+      filteredInventory.sort((a, b) => {
+        if (filter.order === 'asc') {
+          return a.name.localeCompare(b.name);
+        } else {
+          return b.name.localeCompare(a.name);
+        }
+      });
+    } else if (filter.field === 'Count') {
+      filteredInventory.sort((a, b) => {
+        if (filter.order === 'asc') {
+          return a.quantity - b.quantity;
+        } else {
+          return b.quantity - a.quantity;
+        }
+      });
     }
-  };
+    setInventory(filteredInventory);
+  }, [filter, searchValue]);
 
   const addItem = async (item) => {
     const docRef = doc(collection(firestore, 'inventory'), item.toLowerCase());
@@ -107,7 +105,7 @@ export default function Home() {
 
   useEffect(() => {
     updateInventory();
-  }, [filter, searchValue]);
+  }, [filter, searchValue, updateInventory]);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
